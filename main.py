@@ -1,6 +1,9 @@
 import requests
 import json
 from datetime import datetime
+import os
+
+CONFIG_FILE = 'config.json'
 
 def get_weather(city, units='metric'):
     api_key = "my_api_key_goes_here"
@@ -57,10 +60,31 @@ def review_last_log():
     except FileNotFoundError:
         print("No log file found.")
 
+def save_preferences(units, default_city):
+    preferences = {
+        'units': units,
+        'default_city': default_city
+    }
+    with open(CONFIG_FILE, 'w') as config_file:
+        json.dump(preferences, config_file)
+
+def load_preferences():
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as config_file:
+                return json.load(config_file)
+        except json.JSONDecodeError:
+            print("Error loading preferences. Starting with default settings.")
+            return {'units': 'metric', 'default_city': ''}
+    else:
+        return {'units': 'metric', 'default_city': ''}
+
 def main():
-    print("Welcome to the Terminal Weather App!")
+    preferences = load_preferences()
+    print(f"Welcome to the Terminal Weather App! (Default unit: {preferences['units'].capitalize()})")
+    
     while True:
-        command = input("Enter 'fetch' to get weather data, 'review' to review last log, or 'exit' to quit: ").strip().lower()
+        command = input("Enter 'fetch' to get weather data, 'review' to review last log, 'settings' to save preferences, or 'exit' to quit: ").strip().lower()
         
         if command == 'exit':
             print("Goodbye!")
@@ -70,36 +94,43 @@ def main():
             review_last_log()
             continue
         
-        if command != 'fetch':
-            print("Invalid command. Please try again.")
-            continue
-        
-        city_input = input("Enter the city name(s) separated by commas: ").strip()
-        
-        if not city_input:
-            print("Input cannot be empty. Please try again.")
-            continue
-        
-        cities = [city.strip() for city in city_input.split(',')]
-        
-        unit_choice = input("Choose temperature unit (Celsius/Fahrenheit): ").strip().lower()
-        if unit_choice == 'fahrenheit':
-            units = 'imperial'
-        elif unit_choice == 'celsius':
-            units = 'metric'
-        else:
-            print("Invalid unit choice. Defaulting to Celsius.")
-            units = 'metric'
-        
-        for city in cities:
-            weather_data = get_weather(city, units)
-            
-            if weather_data:
-                print(f"\nWeather data for {city} fetched successfully!")
-                display_weather_data(weather_data, units)
-                log_weather_data(city, weather_data)
+        if command == 'settings':
+            default_city = input("Enter your default city (leave empty to skip): ").strip()
+            unit_choice = input("Choose temperature unit (Celsius/Fahrenheit): ").strip().lower()
+            if unit_choice == 'fahrenheit':
+                units = 'imperial'
+            elif unit_choice == 'celsius':
+                units = 'metric'
             else:
-                print(f"\nCity '{city}' not found or API request failed.")
+                print("Invalid unit choice. Defaulting to Celsius.")
+                units = 'metric'
+            
+            save_preferences(units, default_city)
+            print("Preferences saved!")
+            continue
+        
+        if command == 'fetch':
+            city_input = input(f"Enter the city name(s) separated by commas (or press Enter to use default city: {preferences['default_city']}): ").strip()
+            if not city_input and preferences['default_city']:
+                city_input = preferences['default_city']
+            elif not city_input:
+                print("Input cannot be empty. Please try again.")
+                continue
+            
+            cities = [city.strip() for city in city_input.split(',')]
+            units = preferences['units']
+        
+            for city in cities:
+                weather_data = get_weather(city, units)
+                
+                if weather_data:
+                    print(f"\nWeather data for {city} fetched successfully!")
+                    display_weather_data(weather_data, units)
+                    log_weather_data(city, weather_data)
+                else:
+                    print(f"\nCity '{city}' not found or API request failed.")
+        else:
+            print("Invalid command. Please try again.")
 
 if __name__ == "__main__":
     main()
