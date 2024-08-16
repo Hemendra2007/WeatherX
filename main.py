@@ -17,7 +17,7 @@ def get_weather(city, units='metric'):
         print(f"Error fetching weather data: {e}")
         return None
 
-def display_weather_data(weather_data, units):
+def display_weather_data(weather_data, units, wind_units='m/s'):
     temp_label = "Temperature"
     if units == 'imperial':
         temp_label = "Temperature (°F)"
@@ -27,7 +27,7 @@ def display_weather_data(weather_data, units):
     temp = weather_data['main']['temp']
     humidity = weather_data['main']['humidity']
     description = weather_data['weather'][0]['description']
-    wind_speed = weather_data['wind']['speed']
+    wind_speed = convert_wind_speed(weather_data['wind']['speed'], wind_units)
     sunrise = datetime.fromtimestamp(weather_data['sys']['sunrise']).strftime('%H:%M:%S')
     sunset = datetime.fromtimestamp(weather_data['sys']['sunset']).strftime('%H:%M:%S')
     
@@ -35,9 +35,34 @@ def display_weather_data(weather_data, units):
     print(f"{temp_label}: {temp:.2f}")
     print(f"Humidity: {humidity}%")
     print(f"Description: {description.capitalize()}")
-    print(f"Wind Speed: {wind_speed} m/s")
+    print(f"Wind Speed: {wind_speed} {wind_units}")
     print(f"Sunrise: {sunrise}")
     print(f"Sunset: {sunset}\n")
+
+def convert_wind_speed(speed, wind_units):
+    if wind_units == 'km/h':
+        return speed * 3.6
+    elif wind_units == 'mph':
+        return speed * 2.237
+    return speed  # Default is m/s
+
+def check_weather_alerts(weather_data, alerts, units):
+    temp = weather_data['main']['temp']
+    for alert in alerts:
+        condition = alert['condition']
+        threshold = alert['threshold']
+        
+        if (condition == 'above' and temp > threshold) or (condition == 'below' and temp < threshold):
+            print(f"ALERT: Temperature is {temp:.2f}°{get_unit_label(units)}, which is {condition} {threshold}°!")
+
+def get_unit_label(units):
+    return 'F' if units == 'imperial' else 'C'
+
+def set_weather_alert():
+    condition = input("Set alert for temperature 'above' or 'below' a threshold? ").strip().lower()
+    threshold = float(input(f"Enter the temperature threshold (in selected units): "))
+    
+    return {'condition': condition, 'threshold': threshold}
 
 def log_weather_data(city, weather_data):
     timestamp = datetime.now().isoformat()
@@ -101,10 +126,11 @@ def validate_city_input(city_input, default_city):
 
 def main():
     preferences = load_preferences()
+    alerts = []  # List to store weather alerts
     print(f"Welcome to the Terminal Weather App! (Default unit: {preferences['units'].capitalize()})")
     
     while True:
-        command = input("Enter 'fetch' to get weather data, 'review' to review last log, 'settings' to save preferences, 'clear' to clear logs, or 'exit' to quit: ").strip().lower()
+        command = input("Enter 'fetch' to get weather data, 'review' to review last log, 'settings' to save preferences, 'alert' to set weather alerts, 'clear' to clear logs, or 'exit' to quit: ").strip().lower()
         
         if command == 'exit':
             print("Goodbye!")
@@ -133,6 +159,12 @@ def main():
             print("Preferences saved!")
             continue
         
+        if command == 'alert':
+            alert = set_weather_alert()
+            alerts.append(alert)
+            print(f"Alert set: Temperature {alert['condition']} {alert['threshold']}°")
+            continue
+        
         if command == 'fetch':
             city_input = input(f"Enter the city name(s) separated by commas (or press Enter to use default city: {preferences['default_city']}): ").strip()
             city_input = validate_city_input(city_input, preferences['default_city'])
@@ -148,6 +180,7 @@ def main():
                 if weather_data:
                     print(f"\nWeather data for {city} fetched successfully!")
                     display_weather_data(weather_data, units)
+                    check_weather_alerts(weather_data, alerts, units)  # Check for alerts
                     log_weather_data(city, weather_data)
                 else:
                     print(f"\nCity '{city}' not found or API request failed.")
