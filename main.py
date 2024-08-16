@@ -4,10 +4,10 @@ from datetime import datetime
 import os
 
 CONFIG_FILE = 'config.json'
+API_KEY = "my_api_key_goes_here"  # API key directly in the script
 
 def get_weather(city, units='metric'):
-    api_key = "my_api_key_goes_here"
-    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&units={units}&appid={api_key}"
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&units={units}&appid={API_KEY}"
     
     try:
         response = requests.get(url)
@@ -15,6 +15,17 @@ def get_weather(city, units='metric'):
         return response.json()
     except requests.RequestException as e:
         print(f"Error fetching weather data: {e}")
+        return None
+
+def get_forecast(city, units='metric'):
+    url = f"http://api.openweathermap.org/data/2.5/forecast?q={city}&units={units}&appid={API_KEY}"
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error fetching weather forecast: {e}")
         return None
 
 def display_weather_data(weather_data, units, wind_units='m/s'):
@@ -38,6 +49,14 @@ def display_weather_data(weather_data, units, wind_units='m/s'):
     print(f"Wind Speed: {wind_speed} {wind_units}")
     print(f"Sunrise: {sunrise}")
     print(f"Sunset: {sunset}\n")
+
+def display_forecast(forecast_data, units):
+    print("\n7-Day Weather Forecast:")
+    for entry in forecast_data['list']:
+        dt = datetime.fromtimestamp(entry['dt'])
+        temp = entry['main']['temp']
+        description = entry['weather'][0]['description']
+        print(f"{dt.strftime('%Y-%m-%d %H:%M:%S')}: {temp}°{get_unit_label(units)} - {description.capitalize()}")
 
 def convert_wind_speed(speed, wind_units):
     if wind_units == 'km/h':
@@ -99,6 +118,31 @@ def clear_weather_log():
     except Exception as e:
         print(f"Error clearing the weather log: {e}")
 
+def delete_log_entry():
+    try:
+        with open('weather_log.json', 'r') as file:
+            lines = file.readlines()
+        
+        if lines:
+            print("Existing log entries:")
+            for i, line in enumerate(lines):
+                log_entry = json.loads(line)
+                print(f"{i + 1}: {log_entry['timestamp']} - {log_entry['city']}")
+            
+            entry_to_delete = int(input("Enter the number of the log entry to delete: ")) - 1
+            
+            if 0 <= entry_to_delete < len(lines):
+                del lines[entry_to_delete]
+                with open('weather_log.json', 'w') as file:
+                    file.writelines(lines)
+                print("Log entry deleted successfully.")
+            else:
+                print("Invalid entry number.")
+        else:
+            print("No logs found.")
+    except FileNotFoundError:
+        print("No log file found.")
+
 def save_preferences(units, default_city):
     preferences = {
         'units': units,
@@ -130,7 +174,7 @@ def main():
     print(f"Welcome to the Terminal Weather App! (Default unit: {preferences['units'].capitalize()})")
     
     while True:
-        command = input("Enter 'fetch' to get weather data, 'review' to review last log, 'settings' to save preferences, 'alert' to set weather alerts, 'clear' to clear logs, or 'exit' to quit: ").strip().lower()
+        command = input("Enter 'fetch' to get weather data, 'forecast' for 7-day forecast, 'review' to review last log, 'settings' to save preferences, 'alert' to set weather alerts, 'clear' to clear logs, 'delete' to delete a log entry, or 'exit' to quit: ").strip().lower()
         
         if command == 'exit':
             print("Goodbye!")
@@ -142,6 +186,10 @@ def main():
         
         if command == 'review':
             review_last_log()
+            continue
+        
+        if command == 'delete':
+            delete_log_entry()
             continue
         
         if command == 'settings':
@@ -184,8 +232,7 @@ def main():
                     log_weather_data(city, weather_data)
                 else:
                     print(f"\nCity '{city}' not found or API request failed.")
-        else:
-            print("Invalid command. Please try again.")
-
-if __name__ == "__main__":
-    main()
+        
+        elif command == 'forecast':
+            city_input = input(f"Enter the city name for 7-day forecast (or press Enter to use default city: {preferences['default_city']}): ").strip()
+            city_input = validate_city_input(city_input, preferences['
