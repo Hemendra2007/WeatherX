@@ -233,6 +233,14 @@ def main():
                 else:
                     print(f"\nCity '{city}' not found or API request failed.")
         
-        elif command == 'forecast':
+          elif command == 'forecast':
             city_input = input(f"Enter the city name for 7-day forecast (or press Enter to use default city: {preferences['default_city']}): ").strip()
-            city_input = validate_city_input(city_input, preferences['
+            city_input = validate_city_input(city_input, preferences['default_city'])
+            if not city_input:
+                continue
+
+            forecast_data = get_forecast(city_input, preferences['units'])
+            if forecast_data:
+                display_forecast(forecast_data, preferences['units'])
+            else:
+                print(f"\nCity '{city_input}' not found or API request failed.")
